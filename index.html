@@ -6,17 +6,17 @@
 </head>
 <body>
 
-　<script>
+<script>
   const PASSWORD = "yourpassword"; // ← 好きなPWに変更
 
   const input = prompt("パスワードを入力してください");
   if (input !== PASSWORD) {
-    document.body.innerHTML = "アクセス拒否";
+    document.write("アクセス拒否");
+    document.close();
     throw new Error("Unauthorized");
   }
 </script>
 
-  
 <textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
 <br>
 <button id="run">PDF化</button>
@@ -75,4 +75,5 @@
 
 </body>
 </html>
+
 

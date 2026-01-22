@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+  <head>
+<script>
+  const PASSWORD = "yourpassword"; // ← パスワード
+
+  const input = prompt("パスワードを入力してください");
+  if (input !== PASSWORD) {
+    // HTML の読み込みを完全に止める
+    document.write("アクセス拒否");
+    document.close();
+    window.stop(); // ← これが決定打
+  }
+</script>
+</head>
+
   <meta charset="UTF-8">
   <title>PDF化ツール</title>
 </head>
 <body>
-
-<script>
-  const PASSWORD = "yourpassword"; // ← 好きなPWに変更
-
-  const input = prompt("パスワードを入力してください");
-  if (input !== PASSWORD) {
-    document.write("アクセス拒否");
-    document.close();
-    throw new Error("Unauthorized");
-  }
-</script>
 
 <textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
 <br>
@@ -75,5 +78,6 @@
 
 </body>
 </html>
+
 
 

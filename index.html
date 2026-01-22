@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF化ツール</title>
+</head>
+<body>
+
+<textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
+<br>
+<button id="run">PDF化</button>
+
+<div id="msg"></div>
+
+<script>
+  const API_ENDPOINT = "https://example.com/bulk-pdf"; // ← Cloud Run のURLを後で入れる
+
+  function parseUrls(text) {
+    return text
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(x => x.startsWith("http"));
+  }
+
+  document.getElementById("run").addEventListener("click", async () => {
+    const raw = document.getElementById("urls").value;
+    const urls = parseUrls(raw);
+
+    const msg = document.getElementById("msg");
+    msg.textContent = "";
+
+    if (urls.length === 0) {
+      msg.textContent = "有効なURLがありません";
+      return;
+    }
+
+    msg.textContent = "処理中...";
+
+    try {
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls })
+      });
+
+      if (!res.ok) {
+        msg.textContent = "エラー: " + res.status;
+        return;
+      }
+
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "pdfs.zip";
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      msg.textContent = "完了";
+    } catch (e) {
+      msg.textContent = "通信エラー";
+    }
+  });
+</script>
+
+</body>
+</html>

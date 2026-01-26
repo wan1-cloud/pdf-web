@@ -4,6 +4,32 @@
   <meta charset="UTF-8">
   <title>PDF化ツール</title>
 
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #usage {
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #333;
+    }
+    #msg {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #d00;
+    }
+    #run {
+      margin-top: 8px;
+      padding: 6px 16px;
+    }
+  </style>
+
   <script>
     const PASSWORD = "yourpassword"; // ← パスワード
 
@@ -18,65 +44,113 @@
 
 <body>
 
-<textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
-<br>
-<button id="run">PDF化</button>
+  <h1>PDF化ツール</h1>
 
-<div id="msg"></div>
+  <div id="usage">データ処理枠：読み込み中...</div>
 
-<script>
-  const API_ENDPOINT = "https://pdf-api-545757591074.asia-northeast1.run.app/bulk-pdf";
+  <textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
+  <br>
+  <button id="run">PDF化</button>
 
-  function parseUrls(text) {
-    return text
-      .split(/\r?\n/)
-      .map(x => x.trim())
-      .filter(x => x.startsWith("http"));
-  }
+  <div id="msg"></div>
 
-  document.getElementById("run").addEventListener("click", async () => {
-    const raw = document.getElementById("urls").value;
-    const urls = parseUrls(raw);
+  <script>
+    // Cloud Run のエンドポイント（/generate と /usage を同じベースURLで）
+    const API_BASE = "https://pdf-api-545757591074.asia-northeast1.run.app";
+    const GENERATE_ENDPOINT = API_BASE + "/generate";
+    const USAGE_ENDPOINT = API_BASE + "/usage";
 
-    const msg = document.getElementById("msg");
-    msg.textContent = "";
-
-    if (urls.length === 0) {
-      msg.textContent = "有効なURLがありません";
-      return;
+    function parseUrls(text) {
+      return text
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(x => x.startsWith("http"));
     }
 
-    msg.textContent = "処理中...";
+    async function loadUsage() {
+      const usageEl = document.getElementById("usage");
+      try {
+        const res = await fetch(USAGE_ENDPOINT);
+        if (!res.ok) {
+          usageEl.textContent = "データ処理枠：取得エラー";
+          return;
+        }
+        const data = await res.json();
+        usageEl.textContent = `データ処理枠：${data.count} / ${data.limit}（今月 ${data.month}）`;
+      } catch (e) {
+        usageEl.textContent = "データ処理枠：取得エラー";
+      }
+    }
 
-    try {
-      const res = await fetch(API_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          batches: [urls]
-        })
-      });
+    document.getElementById("run").addEventListener("click", async () => {
+      const raw = document.getElementById("urls").value;
+      const urls = parseUrls(raw);
 
-      // ★ res.ok でもエラーでも ZIP は返ってくるので return しない
-      if (!res.ok) {
-        msg.textContent = "エラー: " + res.status + "（ZIPはダウンロードされます）";
+      const msg = document.getElementById("msg");
+      msg.style.color = "#d00";
+      msg.textContent = "";
+
+      if (urls.length === 0) {
+        msg.textContent = "有効なURLがありません";
+        return;
       }
 
-      // ★ ZIP を blob として受け取る（常にここを通る）
-      const blob = await res.blob();
+      msg.style.color = "#333";
+      msg.textContent = "処理中...";
 
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "pdfs.zip";
-      a.click();
-      URL.revokeObjectURL(a.href);
+      try {
+        const res = await fetch(GENERATE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls })
+        });
 
-      msg.textContent = "完了";
-    } catch (e) {
-      msg.textContent = "通信エラー";
-    }
-  });
-</script>
+        // データ処理枠超過（429）の場合は ZIP をダウンロードしない
+        if (res.status === 429) {
+          let errMsg = "データ処理枠を超過したため、PDF生成は中止されました。";
+          try {
+            const data = await res.json();
+            if (data && data.message) {
+              errMsg = data.message;
+            }
+          } catch (_) {}
+          msg.style.color = "#d00";
+          msg.textContent = errMsg;
+          // 使用量も更新しておく
+          loadUsage();
+          return;
+        }
+
+        if (!res.ok) {
+          msg.style.color = "#d00";
+          msg.textContent = "エラー: " + res.status + "（ZIPはダウンロードされる可能性があります）";
+        } else {
+          msg.style.color = "#333";
+        }
+
+        // ZIP を blob として受け取る
+        const blob = await res.blob();
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "pdfs.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        msg.style.color = "#333";
+        msg.textContent = "完了";
+
+        // 使用量を更新
+        loadUsage();
+      } catch (e) {
+        msg.style.color = "#d00";
+        msg.textContent = "通信エラー";
+      }
+    });
+
+    // 初期表示時に使用量を読み込む
+    loadUsage();
+  </script>
 
 </body>
 </html>

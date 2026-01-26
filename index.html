@@ -53,16 +53,18 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          batches: [urls]   // ← ★ここを修正した（唯一の修正点）
+          batches: [urls]
         })
       });
 
+      // ★ res.ok でもエラーでも ZIP は返ってくるので return しない
       if (!res.ok) {
-        msg.textContent = "エラー: " + res.status;
-        return;
+        msg.textContent = "エラー: " + res.status + "（ZIPはダウンロードされます）";
       }
 
+      // ★ ZIP を blob として受け取る（常にここを通る）
       const blob = await res.blob();
+
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "pdfs.zip";

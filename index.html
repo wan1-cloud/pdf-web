@@ -24,7 +24,7 @@
       font-size: 14px;
       color: #d00;
     }
-    #run {
+    button {
       margin-top: 8px;
       padding: 6px 16px;
     }
@@ -48,18 +48,27 @@
 
   <div id="usage">データ処理枠：読み込み中...</div>
 
-  <textarea id="urls" rows="15" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
+  <!-- ▼ URL入力欄 -->
+  <h2>URLからPDF化</h2>
+  <textarea id="urls" rows="10" cols="80" placeholder="1行に1つURLを貼り付けてください"></textarea>
   <br>
   <button id="run">PDF化</button>
+
+  <!-- ▼ 法人番号入力欄 -->
+  <h2>法人番号からPDF化</h2>
+  <textarea id="corpnos" rows="10" cols="80" placeholder="1行に1つ法人番号（16桁）を入力してください"></textarea>
+  <br>
+  <button id="run-corp">法人番号PDF化</button>
 
   <div id="msg"></div>
 
   <script>
-    // Cloud Run のエンドポイント（/generate と /usage を同じベースURLで）
+    // Cloud Run のエンドポイント
     const API_BASE = "https://pdf-api-545757591074.asia-northeast1.run.app";
     const GENERATE_ENDPOINT = API_BASE + "/generate";
     const USAGE_ENDPOINT = API_BASE + "/usage";
 
+    // URL入力欄の処理
     function parseUrls(text) {
       return text
         .split(/\r?\n/)
@@ -67,6 +76,16 @@
         .filter(x => x.startsWith("http"));
     }
 
+    // 法人番号 → 国税庁URL変換
+    function parseCorpNos(text) {
+      return text
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(x => /^\d{16}$/.test(x)) // 16桁の数字のみ
+        .map(no => `https://www.houjin-bangou.nta.go.jp/henkorireki-johoto.html?selHouzinNo=${no}`);
+    }
+
+    // 使用量取得
     async function loadUsage() {
       const usageEl = document.getElementById("usage");
       try {
@@ -82,6 +101,49 @@
       }
     }
 
+    // ▼ 共通のPDF生成処理
+    async function runPdfGeneration(urls) {
+      const msg = document.getElementById("msg");
+      msg.style.color = "#333";
+      msg.textContent = "処理中...";
+
+      try {
+        const res = await fetch(GENERATE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls })
+        });
+
+        if (res.status === 429) {
+          let errMsg = "データ処理枠を超過したため、PDF生成は中止されました。";
+          try {
+            const data = await res.json();
+            if (data && data.message) errMsg = data.message;
+          } catch (_) {}
+          msg.style.color = "#d00";
+          msg.textContent = errMsg;
+          loadUsage();
+          return;
+        }
+
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "pdfs.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        msg.style.color = "#333";
+        msg.textContent = "完了";
+        loadUsage();
+
+      } catch (e) {
+        msg.style.color = "#d00";
+        msg.textContent = "通信エラー";
+      }
+    }
+
+    // ▼ URL PDF化ボタン
     document.getElementById("run").addEventListener("click", async () => {
       const raw = document.getElementById("urls").value;
       const urls = parseUrls(raw);
@@ -95,60 +157,27 @@
         return;
       }
 
-      msg.style.color = "#333";
-      msg.textContent = "処理中...";
-
-      try {
-        const res = await fetch(GENERATE_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ urls })
-        });
-
-        // データ処理枠超過（429）の場合は ZIP をダウンロードしない
-        if (res.status === 429) {
-          let errMsg = "データ処理枠を超過したため、PDF生成は中止されました。";
-          try {
-            const data = await res.json();
-            if (data && data.message) {
-              errMsg = data.message;
-            }
-          } catch (_) {}
-          msg.style.color = "#d00";
-          msg.textContent = errMsg;
-          // 使用量も更新しておく
-          loadUsage();
-          return;
-        }
-
-        if (!res.ok) {
-          msg.style.color = "#d00";
-          msg.textContent = "エラー: " + res.status + "（ZIPはダウンロードされる可能性があります）";
-        } else {
-          msg.style.color = "#333";
-        }
-
-        // ZIP を blob として受け取る
-        const blob = await res.blob();
-
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "pdfs.zip";
-        a.click();
-        URL.revokeObjectURL(a.href);
-
-        msg.style.color = "#333";
-        msg.textContent = "完了";
-
-        // 使用量を更新
-        loadUsage();
-      } catch (e) {
-        msg.style.color = "#d00";
-        msg.textContent = "通信エラー";
-      }
+      await runPdfGeneration(urls);
     });
 
-    // 初期表示時に使用量を読み込む
+    // ▼ 法人番号 PDF化ボタン
+    document.getElementById("run-corp").addEventListener("click", async () => {
+      const raw = document.getElementById("corpnos").value;
+      const urls = parseCorpNos(raw);
+
+      const msg = document.getElementById("msg");
+      msg.style.color = "#d00";
+      msg.textContent = "";
+
+      if (urls.length === 0) {
+        msg.textContent = "有効な法人番号がありません（16桁の数字のみ有効）";
+        return;
+      }
+
+      await runPdfGeneration(urls);
+    });
+
+    // 初期表示で使用量を読み込む
     loadUsage();
   </script>
 

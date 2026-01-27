@@ -22,14 +22,13 @@
       font-size: 14px;
       color: #333;
     }
-    #msg {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #d00;
-    }
     button {
       margin-top: 8px;
       padding: 6px 16px;
+    }
+    #msg-url, #msg-corp {
+      margin-top: 10px;
+      font-size: 14px;
     }
   </style>
 
@@ -63,6 +62,8 @@
         <button id="run">PDF化</button>
         <button id="clear-urls">クリア</button>
       </div>
+
+      <div id="msg-url"></div>
     </div>
 
     <!-- ▼ 法人番号入力欄 -->
@@ -74,11 +75,11 @@
         <button id="run-corp">法人番号PDF化</button>
         <button id="clear-corp">クリア</button>
       </div>
+
+      <div id="msg-corp"></div>
     </div>
 
   </div>
-
-  <div id="msg"></div>
 
   <script>
     const API_BASE = "https://pdf-api-545757591074.asia-northeast1.run.app";
@@ -115,10 +116,9 @@
       }
     }
 
-    async function runPdfGeneration(urls) {
-      const msg = document.getElementById("msg");
-      msg.style.color = "#333";
-      msg.textContent = "処理中...";
+    async function runPdfGeneration(urls, msgEl) {
+      msgEl.style.color = "#333";
+      msgEl.textContent = "処理中...";
 
       try {
         const res = await fetch(GENERATE_ENDPOINT, {
@@ -133,8 +133,8 @@
             const data = await res.json();
             if (data && data.message) errMsg = data.message;
           } catch (_) {}
-          msg.style.color = "#d00";
-          msg.textContent = errMsg;
+          msgEl.style.color = "#d00";
+          msgEl.textContent = errMsg;
           loadUsage();
           return;
         }
@@ -146,13 +146,13 @@
         a.click();
         URL.revokeObjectURL(a.href);
 
-        msg.style.color = "#333";
-        msg.textContent = "完了";
+        msgEl.style.color = "#333";
+        msgEl.textContent = "完了";
         loadUsage();
 
       } catch (e) {
-        msg.style.color = "#d00";
-        msg.textContent = "通信エラー";
+        msgEl.style.color = "#d00";
+        msgEl.textContent = "通信エラー";
       }
     }
 
@@ -160,41 +160,42 @@
       const raw = document.getElementById("urls").value;
       const urls = parseUrls(raw);
 
-      const msg = document.getElementById("msg");
-      msg.style.color = "#d00";
-      msg.textContent = "";
+      const msgEl = document.getElementById("msg-url");
+      msgEl.textContent = "";
 
       if (urls.length === 0) {
-        msg.textContent = "有効なURLがありません";
+        msgEl.style.color = "#d00";
+        msgEl.textContent = "有効なURLがありません";
         return;
       }
 
-      await runPdfGeneration(urls);
+      await runPdfGeneration(urls, msgEl);
     });
 
     document.getElementById("run-corp").addEventListener("click", async () => {
       const raw = document.getElementById("corpnos").value;
       const urls = parseCorpNos(raw);
 
-      const msg = document.getElementById("msg");
-      msg.style.color = "#d00";
-      msg.textContent = "";
+      const msgEl = document.getElementById("msg-corp");
+      msgEl.textContent = "";
 
       if (urls.length === 0) {
-        msg.textContent = "有効な法人番号がありません（13桁の数字のみ有効）";
+        msgEl.style.color = "#d00";
+        msgEl.textContent = "有効な法人番号がありません（13桁の数字のみ有効）";
         return;
       }
 
-      await runPdfGeneration(urls);
+      await runPdfGeneration(urls, msgEl);
     });
 
-    // ▼ クリアボタン
     document.getElementById("clear-urls").addEventListener("click", () => {
       document.getElementById("urls").value = "";
+      document.getElementById("msg-url").textContent = "";
     });
 
     document.getElementById("clear-corp").addEventListener("click", () => {
       document.getElementById("corpnos").value = "";
+      document.getElementById("msg-corp").textContent = "";
     });
 
     loadUsage();

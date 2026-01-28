@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>PDF化ツール</title>
 
-  <!-- 外部CSS -->
   <link rel="stylesheet" href="style.css">
 
   <style>
@@ -50,10 +49,8 @@
 
   <div id="usage">データ処理枠：読み込み中...</div>
 
-  <!-- ▼ 横並びレイアウト -->
   <div class="row">
 
-    <!-- ▼ URL入力欄 -->
     <div class="block">
       <h2>URLからPDF化</h2>
       <textarea id="urls" rows="10" placeholder="1行に1つURLを貼り付けてください"></textarea>
@@ -66,7 +63,6 @@
       <div id="msg-url"></div>
     </div>
 
-    <!-- ▼ 法人番号入力欄 -->
     <div class="block">
       <h2>法人番号からPDF化</h2>
       <textarea id="corpnos" rows="10" placeholder="1行に1つ法人番号（13桁）を入力してください"></textarea>
@@ -85,6 +81,11 @@
     const API_BASE = "https://pdf-api-545757591074.asia-northeast1.run.app";
     const GENERATE_ENDPOINT = API_BASE + "/generate";
     const USAGE_ENDPOINT = API_BASE + "/usage";
+
+    let isProcessing = false;
+
+    const btnUrl = document.getElementById("run");
+    const btnCorp = document.getElementById("run-corp");
 
     function parseUrls(text) {
       return text
@@ -117,6 +118,17 @@
     }
 
     async function runPdfGeneration(urls, msgEl) {
+
+      if (isProcessing) {
+        msgEl.style.color = "#d00";
+        msgEl.textContent = "別の処理が実行中です。完了までお待ちください。";
+        return;
+      }
+
+      isProcessing = true;
+      btnUrl.disabled = true;
+      btnCorp.disabled = true;
+
       msgEl.style.color = "#333";
       msgEl.textContent = "処理中...";
 
@@ -153,6 +165,10 @@
       } catch (e) {
         msgEl.style.color = "#d00";
         msgEl.textContent = "通信エラー";
+      } finally {
+        isProcessing = false;
+        btnUrl.disabled = false;
+        btnCorp.disabled = false;
       }
     }
 
